@@ -34,12 +34,12 @@ func NewBuffer(datastore auditlog.AuditLogDatastore) *Buffer {
 
 	flushIntervalSeconds := viper.GetInt("AUDIT_BUFFER_FLUSH_INTERVAL")
 	if flushIntervalSeconds == 0 {
-		flushIntervalSeconds = 5 // default
+		flushIntervalSeconds = 30 // default
 	}
 
 	batchSize := viper.GetInt("AUDIT_BUFFER_BATCH_SIZE")
 	if batchSize == 0 {
-		batchSize = 50 // default
+		batchSize = 100 // default
 	}
 
 	b := &Buffer{
