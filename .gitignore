@@ -29,7 +29,6 @@ go.work
 Thumbs.db
 
 # Environment files with sensitive data
-configs/app.env
 
 # Build artifacts
 dist/
