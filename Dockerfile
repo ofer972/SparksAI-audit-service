@@ -7,7 +7,7 @@ WORKDIR /src/cmd
 RUN go build -o /app/audit_service .
 
 RUN mkdir /app/configs
-RUN cp /src/configs/app.env /app/configs
+RUN cp ../configs/app.env /app/configs
 
 FROM golang:1.25-alpine AS bin-unix
 COPY --from=build /app /sparksai-audit-service
