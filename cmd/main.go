@@ -50,13 +50,7 @@ func init() {
 	if path := os.Getenv("AGILEAGENT_SERVER_HOMEDIR"); path != "" {
 		dir = path + "/configs"
 	} else {
-		// If running from audit-service directory, use ./configs
-		// If running from cmd directory, use ../configs
-		if _, err := os.Stat("configs"); err == nil {
-			dir = "configs"
-		} else {
-			dir += "/../configs"
-		}
+		dir += "/../configs"
 	}
 
 	viper.SetConfigName("app")
@@ -66,9 +60,6 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file, %s", err)
 	}
-
-	// Debug: Print config file location
-	log.Printf("Config file loaded from: %s", viper.ConfigFileUsed())
 
 	viper.AutomaticEnv()
 }
