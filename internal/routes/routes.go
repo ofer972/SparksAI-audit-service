@@ -61,6 +61,7 @@ func readinessHandler(w http.ResponseWriter, r *http.Request) {
 
 func SetupRoutes(r *mux.Router) {
 	auditSvc := auditlogService.Get()
+	reportSvc := auditlogService.NewReportService()
 
 	// Health check endpoints
 	r.HandleFunc("/health", healthCheckHandler).Methods("GET")
@@ -71,5 +72,8 @@ func SetupRoutes(r *mux.Router) {
 	r.HandleFunc("/api/audit-logs", auditSvc.CreateAuditLogsHandler).Methods("POST")
 	r.HandleFunc("/api/audit-logs", auditSvc.GetAuditLogsHandler).Methods("GET")
 	r.HandleFunc("/api/audit-logs/actions", auditSvc.GetActionsHandler).Methods("GET")
+
+	// Report routes
+	r.HandleFunc("/api/v1/audit-service/reports/{report_id}", reportSvc.GetReport).Methods("GET")
 }
 

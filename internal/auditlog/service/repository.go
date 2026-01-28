@@ -103,8 +103,8 @@ func (db *AuditLogDB) BatchInsertAuditLogs(logs []auditlog.AuditLog) error {
 			user_id, endpoint_path, session_id, action, action_date, count, http_method, status_code,
 			response_time_seconds, ip_address, user_agent,
 			chat_history_id, insights_id, tokens_used,
-			query_raw, body_raw
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			query_raw, body_raw, response_body
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -152,6 +152,12 @@ func (db *AuditLogDB) BatchInsertAuditLogs(logs []auditlog.AuditLog) error {
 			bodyRawVal = marshalToJSONBString(parsed, *logEntry.BodyRaw)
 		}
 
+		var responseBodyVal interface{}
+		if logEntry.ResponseBody != nil {
+			parsed := parseBodyRaw(*logEntry.ResponseBody)
+			responseBodyVal = marshalToJSONBString(parsed, *logEntry.ResponseBody)
+		}
+
 		_, err := stmt.Exec(
 			logEntry.UserID,
 			logEntry.EndpointPath,
@@ -169,6 +175,7 @@ func (db *AuditLogDB) BatchInsertAuditLogs(logs []auditlog.AuditLog) error {
 			tokensUsedVal,
 			queryRawVal,
 			bodyRawVal,
+			responseBodyVal,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert audit log: %w", err)

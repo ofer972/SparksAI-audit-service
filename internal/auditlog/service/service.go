@@ -5,11 +5,39 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/motiso/sparksai-audit-service/internal/auditlog"
 	"github.com/motiso/sparksai-audit-service/internal/buffer"
 )
+
+var numericEndingRegex = regexp.MustCompile(`/\d+$`)
+var purelyNumericRegex = regexp.MustCompile(`^\d+$`)
+
+// normalizeEndpoint replaces trailing numeric IDs with /*
+// Example: /api/v1/goals/135 -> /api/v1/goals/*
+func normalizeEndpoint(path string) string {
+	return numericEndingRegex.ReplaceAllString(path, "/*")
+}
+
+// normalizeAction returns a short action name if the action is purely numeric
+// Example: action="135", endpoint="/api/v1/goals/135" -> "goal-by-id"
+func normalizeAction(action string, endpointPath string) string {
+	if action == "" || !purelyNumericRegex.MatchString(action) {
+		return action
+	}
+	// Extract resource from endpoint: /api/v1/goals/135 -> "goals"
+	parts := strings.Split(strings.Trim(endpointPath, "/"), "/")
+	if len(parts) >= 3 {
+		resource := parts[2] // "goals", "issues", "sprints", etc.
+		// Singularize by removing trailing 's'
+		singular := strings.TrimSuffix(resource, "s")
+		return singular + "-by-id"
+	}
+	return action
+}
 
 var auditService *AuditService
 
@@ -44,20 +72,27 @@ func (as *AuditService) CreateAuditLogsHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Validate required fields
-	for i, logEntry := range req.Logs {
-		if logEntry.EndpointPath == "" {
+	// Validate required fields and normalize
+	for i := range req.Logs {
+		if req.Logs[i].EndpointPath == "" {
 			http.Error(w, fmt.Sprintf("endpoint_path is required for log entry %d", i), http.StatusBadRequest)
 			return
 		}
-		if logEntry.HTTPMethod == "" {
+		if req.Logs[i].HTTPMethod == "" {
 			http.Error(w, fmt.Sprintf("http_method is required for log entry %d", i), http.StatusBadRequest)
 			return
 		}
-		if logEntry.StatusCode == 0 {
+		if req.Logs[i].StatusCode == 0 {
 			http.Error(w, fmt.Sprintf("status_code is required for log entry %d", i), http.StatusBadRequest)
 			return
 		}
+
+		// Normalize action and endpoint
+		if req.Logs[i].Action != nil {
+			normalized := normalizeAction(*req.Logs[i].Action, req.Logs[i].EndpointPath)
+			req.Logs[i].Action = &normalized
+		}
+		req.Logs[i].EndpointPath = normalizeEndpoint(req.Logs[i].EndpointPath)
 	}
 
 	// Add logs to buffer (non-blocking)

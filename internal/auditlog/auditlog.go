@@ -5,7 +5,7 @@ type AuditLog struct {
 	ID                  int     `json:"id"`
 	UserID              *string `json:"user_id,omitempty"`
 	EndpointPath        string  `json:"endpoint_path"`
-	SessionID           *string `json:"session_id,omitempty"` // UUID
+	SessionID           *string `json:"session_id,omitempty"` // String
 	Action              *string `json:"action,omitempty"`
 	ActionDate          *string `json:"action_date,omitempty"`
 	Count               *int    `json:"count,omitempty"`
@@ -20,6 +20,7 @@ type AuditLog struct {
 	TokensUsed          *int    `json:"tokens_used,omitempty"`
 	QueryRaw            *string `json:"query_raw,omitempty"`           // JSONB as string (raw query string)
 	BodyRaw             *string `json:"body_raw,omitempty"`            // JSONB as string (raw body)
+	ResponseBody        *string `json:"response_body,omitempty"`       // JSONB as string (response body for LLM)
 }
 
 // CreateAuditLogsRequest represents the request body for creating audit logs

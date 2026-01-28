@@ -10,6 +10,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Database application name for PostgreSQL connection identification
+const DB_APPLICATION_NAME = "SparksAI-Audit"
+
 var db *sql.DB
 
 func initDB() {
@@ -79,7 +82,7 @@ func createAndOpen(name string, dsn string) (*sql.DB, error) {
 			id SERIAL PRIMARY KEY,
 			user_id VARCHAR(255),
 			endpoint_path VARCHAR(500) NOT NULL,
-			session_id UUID,
+			session_id VARCHAR(255),
 			action VARCHAR(255),
 			action_date TIMESTAMP WITH TIME ZONE,
 			count INTEGER,
@@ -93,11 +96,12 @@ func createAndOpen(name string, dsn string) (*sql.DB, error) {
 			insights_id INTEGER,
 			tokens_used INTEGER,
 			query_raw JSONB,
-			body_raw JSONB
+			body_raw JSONB,
+			response_body JSONB
 		);`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);`,
-		`CREATE INDEX IF NOT EXISTS idx_audit_logs_query_raw ON audit_logs USING GIN (query_raw);`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_body_raw ON audit_logs USING GIN (body_raw);`,
 	}
 
@@ -117,7 +121,7 @@ func connectDB() *sql.DB {
 	// Debug: Print database config (without password)
 	log.Printf("Connecting to database: host=%s port=%s user=%s db=%s", databaseHost, databasePort, username, databasename)
 
-	dbURI := fmt.Sprintf("host=%s port=%s user=%s password=%s sslmode=disable ", databaseHost, databasePort, username, password)
+	dbURI := fmt.Sprintf("host=%s port=%s user=%s password=%s sslmode=disable application_name=%s ", databaseHost, databasePort, username, password, DB_APPLICATION_NAME)
 
 	//connect to db URI
 	db, err := createAndOpen(databasename, dbURI)
