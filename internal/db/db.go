@@ -103,6 +103,7 @@ func createAndOpen(name string, dsn string) (*sql.DB, error) {
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_logs_severity ON audit_logs(severity);`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_body_raw ON audit_logs USING GIN (body_raw);`,
 	}
 
