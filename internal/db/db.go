@@ -81,6 +81,7 @@ func createAndOpen(name string, dsn string) (*sql.DB, error) {
 		`CREATE TABLE IF NOT EXISTS audit_logs (
 			id SERIAL PRIMARY KEY,
 			user_id VARCHAR(255),
+			severity VARCHAR(20) DEFAULT 'NONE' NOT NULL,
 			endpoint_path VARCHAR(500) NOT NULL,
 			session_id VARCHAR(255),
 			action VARCHAR(255),

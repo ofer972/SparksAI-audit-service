@@ -100,11 +100,11 @@ func (db *AuditLogDB) BatchInsertAuditLogs(logs []auditlog.AuditLog) error {
 	// Prepare statement
 	stmt, err := tx.Prepare(`
 		INSERT INTO audit_logs (
-			user_id, endpoint_path, session_id, action, action_date, count, http_method, status_code,
+			user_id, severity, endpoint_path, session_id, action, action_date, count, http_method, status_code,
 			response_time_seconds, ip_address, user_agent,
 			chat_history_id, insights_id, tokens_used,
 			query_raw, body_raw, response_body
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -160,6 +160,7 @@ func (db *AuditLogDB) BatchInsertAuditLogs(logs []auditlog.AuditLog) error {
 
 		_, err := stmt.Exec(
 			logEntry.UserID,
+			logEntry.Severity,
 			logEntry.EndpointPath,
 			sessionIDVal,
 			logEntry.Action,
@@ -205,7 +206,7 @@ func (db *AuditLogDB) GetAuditLogs(userID *string, action *string, limit int) ([
 	// Build query with optional filters
 	query := `
 		SELECT 
-			id, user_id, endpoint_path, session_id, action, action_date, count, http_method, status_code,
+			id, user_id, severity, endpoint_path, session_id, action, action_date, count, http_method, status_code,
 			response_time_seconds, created_at, ip_address, user_agent,
 			chat_history_id, insights_id, tokens_used,
 			query_raw, body_raw
@@ -248,6 +249,7 @@ func (db *AuditLogDB) GetAuditLogs(userID *string, action *string, limit int) ([
 			err := rows.Scan(
 				&logEntry.ID,
 				&userIDVal,
+				&logEntry.Severity,
 				&logEntry.EndpointPath,
 				&sessionIDVal,
 				&actionVal,

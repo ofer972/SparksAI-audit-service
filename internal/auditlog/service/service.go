@@ -87,6 +87,11 @@ func (as *AuditService) CreateAuditLogsHandler(w http.ResponseWriter, r *http.Re
 			return
 		}
 
+		// Set default severity if empty (database will also default to "NONE", but set it here for consistency)
+		if req.Logs[i].Severity == "" {
+			req.Logs[i].Severity = "NONE"
+		}
+
 		// Normalize action and endpoint
 		if req.Logs[i].Action != nil {
 			normalized := normalizeAction(*req.Logs[i].Action, req.Logs[i].EndpointPath)

@@ -4,6 +4,7 @@ package auditlog
 type AuditLog struct {
 	ID                  int     `json:"id"`
 	UserID              *string `json:"user_id,omitempty"`
+	Severity            string  `json:"severity,omitempty"`
 	EndpointPath        string  `json:"endpoint_path"`
 	SessionID           *string `json:"session_id,omitempty"` // String
 	Action              *string `json:"action,omitempty"`

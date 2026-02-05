@@ -39,6 +39,7 @@ func (s *ReportService) GetReport(w http.ResponseWriter, r *http.Request) {
 	statusCodeMin := r.URL.Query().Get("status_code_min")
 	statusCodeMax := r.URL.Query().Get("status_code_max")
 	searchQuery := r.URL.Query().Get("search_query")
+	severity := r.URL.Query().Get("severity")
 
 	filters := map[string]interface{}{
 		"months":            months,
@@ -52,6 +53,7 @@ func (s *ReportService) GetReport(w http.ResponseWriter, r *http.Request) {
 		"status_code_min":   statusCodeMin,
 		"status_code_max":   statusCodeMax,
 		"search_query":      searchQuery,
+		"severity":          severity,
 	}
 
 	// Route to appropriate data function
@@ -406,6 +408,7 @@ type FailedEndpoint struct {
 	Action       string  `json:"action"`
 	EndpointPath string  `json:"endpoint_path"`
 	StatusCode   int     `json:"status_code"`
+	Severity     string  `json:"severity"`
 	Count        int     `json:"count"`
 	Percentage   float64 `json:"percentage"`
 }
@@ -418,6 +421,7 @@ func (s *ReportService) getFailedEndpoints(filters map[string]interface{}) ([]Fa
 			COALESCE(action, endpoint_path, '') as action,
 			COALESCE(endpoint_path, '') as endpoint_path,
 			status_code,
+			severity,
 			COUNT(*) as count
 		FROM audit_logs
 		WHERE created_at >= $1
@@ -432,8 +436,14 @@ func (s *ReportService) getFailedEndpoints(filters map[string]interface{}) ([]Fa
 		argIndex++
 	}
 
+	if severity := getString(filters, "severity", ""); severity != "" {
+		query += " AND severity = $" + strconv.Itoa(argIndex)
+		args = append(args, severity)
+		argIndex++
+	}
+
 	query += `
-		GROUP BY COALESCE(action, endpoint_path, ''), COALESCE(endpoint_path, ''), status_code
+		GROUP BY COALESCE(action, endpoint_path, ''), COALESCE(endpoint_path, ''), status_code, severity
 		ORDER BY count DESC
 		LIMIT 400
 	`
@@ -448,9 +458,9 @@ func (s *ReportService) getFailedEndpoints(filters map[string]interface{}) ([]Fa
 	var totalCount int
 
 	for rows.Next() {
-		var action, endpointPath string
+		var action, endpointPath, severity string
 		var statusCode, count int
-		if err := rows.Scan(&action, &endpointPath, &statusCode, &count); err != nil {
+		if err := rows.Scan(&action, &endpointPath, &statusCode, &severity, &count); err != nil {
 			return nil, err
 		}
 		totalCount += count
@@ -458,6 +468,7 @@ func (s *ReportService) getFailedEndpoints(filters map[string]interface{}) ([]Fa
 			Action:       action,
 			EndpointPath: endpointPath,
 			StatusCode:   statusCode,
+			Severity:     severity,
 			Count:        count,
 		})
 	}
