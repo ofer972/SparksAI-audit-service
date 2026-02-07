@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	database "github.com/motiso/sparksai-audit-service/internal/db"
+	"github.com/motiso/sparksai-audit-service/internal/auditlog"
 )
 
 type ReportService struct {
@@ -77,6 +78,8 @@ func (s *ReportService) GetReport(w http.ResponseWriter, r *http.Request) {
 		result, err = s.getMostActiveUsers(filters)
 	case "audit-daily-active-users":
 		result, err = s.getDailyActiveUsers(filters)
+	case "audit-logs":
+		result, err = s.getAuditLogs(filters)
 	default:
 		http.Error(w, "Report not found", http.StatusNotFound)
 		return
@@ -713,5 +716,263 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// GetAuditLogsFilterValues retrieves all distinct values for filter dropdowns
+func (s *ReportService) GetAuditLogsFilterValues() (map[string]interface{}, error) {
+	query := `
+		WITH http_methods AS (
+			SELECT DISTINCT http_method::text as value, 'http_method' as type
+			FROM audit_logs
+			WHERE http_method IS NOT NULL
+		),
+		status_codes AS (
+			SELECT DISTINCT status_code::text as value, 'status_code' as type
+			FROM audit_logs
+		),
+		severities AS (
+			SELECT DISTINCT severity as value, 'severity' as type
+			FROM audit_logs
+			WHERE severity IS NOT NULL
+		),
+		user_ids AS (
+			SELECT DISTINCT user_id as value, 'user_id' as type
+			FROM audit_logs
+			WHERE user_id IS NOT NULL
+		),
+		actions AS (
+			SELECT DISTINCT action as value, 'action' as type
+			FROM audit_logs
+			WHERE action IS NOT NULL
+		)
+		SELECT value, type FROM http_methods
+		UNION ALL
+		SELECT value, type FROM status_codes
+		UNION ALL
+		SELECT value, type FROM severities
+		UNION ALL
+		SELECT value, type FROM user_ids
+		UNION ALL
+		SELECT value, type FROM actions
+		ORDER BY type, value
+	`
+
+	rows, err := s.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := map[string]interface{}{
+		"http_methods": []string{},
+		"status_codes": []int{},
+		"severities":  []string{},
+		"user_ids":     []string{},
+		"actions":     []string{},
+	}
+
+	httpMethods := []string{}
+	statusCodes := []int{}
+	severities := []string{}
+	userIDs := []string{}
+	actions := []string{}
+
+	for rows.Next() {
+		var value, typeStr string
+		if err := rows.Scan(&value, &typeStr); err != nil {
+			return nil, err
+		}
+
+		switch typeStr {
+		case "http_method":
+			httpMethods = append(httpMethods, value)
+		case "status_code":
+			if code, err := strconv.Atoi(value); err == nil {
+				statusCodes = append(statusCodes, code)
+			}
+		case "severity":
+			severities = append(severities, value)
+		case "user_id":
+			userIDs = append(userIDs, value)
+		case "action":
+			actions = append(actions, value)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result["http_methods"] = httpMethods
+	result["status_codes"] = statusCodes
+	result["severities"] = severities
+	result["user_ids"] = userIDs
+	result["actions"] = actions
+
+	return result, nil
+}
+
+// getAuditLogs retrieves audit logs with filters
+func (s *ReportService) getAuditLogs(filters map[string]interface{}) ([]auditlog.AuditLog, error) {
+	// Parse filters
+	userID := getString(filters, "user_id", "")
+	severity := getString(filters, "severity", "")
+	action := getString(filters, "action", "")
+	httpMethod := getString(filters, "http_method", "")
+	statusCodeStr := getString(filters, "status_code", "")
+	dateFromStr := getString(filters, "date_from", "")
+	minTokensStr := getString(filters, "min_tokens", "")
+	limitStr := getString(filters, "limit", "100")
+
+	// Parse limit (default 100, max 500)
+	limit := 100
+	if limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil {
+			if parsed > 0 && parsed <= 500 {
+				limit = parsed
+			} else if parsed > 500 {
+				limit = 500
+			}
+		}
+	}
+
+	// Build query
+	query := `
+		SELECT 
+			id, user_id, severity, endpoint_path, session_id, action, action_date, count, http_method, status_code,
+			response_time_seconds, created_at, ip_address, user_agent,
+			chat_history_id, insights_id, tokens_used,
+			query_raw, body_raw, response_body
+		FROM audit_logs
+		WHERE 1=1
+	`
+	args := []interface{}{}
+	argIndex := 1
+
+	// Default date_from to today if not provided
+	var dateFrom time.Time
+	if dateFromStr != "" {
+		parsed, err := time.Parse("2006-01-02", dateFromStr)
+		if err == nil {
+			dateFrom = parsed.UTC()
+		} else {
+			dateFrom = time.Now().UTC().Truncate(24 * time.Hour)
+		}
+	} else {
+		dateFrom = time.Now().UTC().Truncate(24 * time.Hour)
+	}
+	query += " AND created_at >= $" + strconv.Itoa(argIndex)
+	args = append(args, dateFrom)
+	argIndex++
+
+	if userID != "" {
+		query += " AND user_id = $" + strconv.Itoa(argIndex)
+		args = append(args, userID)
+		argIndex++
+	}
+
+	if severity != "" {
+		query += " AND severity = $" + strconv.Itoa(argIndex)
+		args = append(args, severity)
+		argIndex++
+	}
+
+	if action != "" {
+		query += " AND action = $" + strconv.Itoa(argIndex)
+		args = append(args, action)
+		argIndex++
+	}
+
+	if httpMethod != "" {
+		query += " AND http_method = $" + strconv.Itoa(argIndex)
+		args = append(args, httpMethod)
+		argIndex++
+	}
+
+	if statusCodeStr != "" {
+		if statusCode, err := strconv.Atoi(statusCodeStr); err == nil {
+			query += " AND status_code = $" + strconv.Itoa(argIndex)
+			args = append(args, statusCode)
+			argIndex++
+		}
+	}
+
+	if minTokensStr != "" {
+		if minTokens, err := strconv.Atoi(minTokensStr); err == nil {
+			query += " AND tokens_used >= $" + strconv.Itoa(argIndex)
+			args = append(args, minTokens)
+			argIndex++
+		}
+	}
+
+	query += " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex)
+	args = append(args, limit)
+
+	rows, err := s.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []auditlog.AuditLog
+	for rows.Next() {
+		var logEntry auditlog.AuditLog
+		var userIDVal, sessionIDVal, actionVal, ipAddressVal, userAgentVal sql.NullString
+		var chatHistoryIDVal, insightsIDVal, tokensUsedVal, countVal sql.NullInt64
+		var queryRawVal, bodyRawVal, responseBodyVal sql.NullString
+		var createdAt, actionDateVal sql.NullTime
+
+		err := rows.Scan(
+			&logEntry.ID,
+			&userIDVal,
+			&logEntry.Severity,
+			&logEntry.EndpointPath,
+			&sessionIDVal,
+			&actionVal,
+			&actionDateVal,
+			&countVal,
+			&logEntry.HTTPMethod,
+			&logEntry.StatusCode,
+			&logEntry.ResponseTimeSeconds,
+			&createdAt,
+			&ipAddressVal,
+			&userAgentVal,
+			&chatHistoryIDVal,
+			&insightsIDVal,
+			&tokensUsedVal,
+			&queryRawVal,
+			&bodyRawVal,
+			&responseBodyVal,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert nullable fields
+		logEntry.UserID = nullStringToPtr(userIDVal)
+		logEntry.SessionID = nullStringToPtr(sessionIDVal)
+		logEntry.Action = nullStringToPtr(actionVal)
+		logEntry.IPAddress = nullStringToPtr(ipAddressVal)
+		logEntry.UserAgent = nullStringToPtr(userAgentVal)
+		logEntry.QueryRaw = nullStringToPtr(queryRawVal)
+		logEntry.BodyRaw = nullStringToPtr(bodyRawVal)
+		logEntry.ResponseBody = nullStringToPtr(responseBodyVal)
+
+		logEntry.ActionDate = nullTimeToRFC3339Ptr(actionDateVal)
+		logEntry.CreatedAt = nullTimeToRFC3339(createdAt)
+
+		logEntry.Count = nullInt64ToIntPtr(countVal)
+		logEntry.ChatHistoryID = nullInt64ToIntPtr(chatHistoryIDVal)
+		logEntry.InsightsID = nullInt64ToIntPtr(insightsIDVal)
+		logEntry.TokensUsed = nullInt64ToIntPtr(tokensUsedVal)
+
+		logs = append(logs, logEntry)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return logs, nil
 }
 

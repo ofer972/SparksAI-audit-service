@@ -178,3 +178,19 @@ func (as *AuditService) GetActionsHandler(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(actions)
 }
 
+// GetAuditLogsFilterValuesHandler handles GET /api/audit-logs/filter-values
+// Returns all distinct values for filter dropdowns in a single response
+func (as *AuditService) GetAuditLogsFilterValuesHandler(w http.ResponseWriter, r *http.Request) {
+	reportSvc := NewReportService()
+	values, err := reportSvc.GetAuditLogsFilterValues()
+	if err != nil {
+		log.Printf("error occurred during GetAuditLogsFilterValues: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Return JSON response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(values)
+}
+

@@ -87,7 +87,7 @@ func createAndOpen(name string, dsn string) (*sql.DB, error) {
 			action VARCHAR(255),
 			action_date TIMESTAMP WITH TIME ZONE,
 			count INTEGER,
-			http_method VARCHAR(10) NOT NULL,
+			http_method VARCHAR(20) NOT NULL,
 			status_code INTEGER NOT NULL,
 			response_time_seconds NUMERIC(10, 3) NOT NULL,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
