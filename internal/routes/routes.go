@@ -72,6 +72,7 @@ func SetupRoutes(r *mux.Router) {
 	r.HandleFunc("/api/audit-logs", auditSvc.CreateAuditLogsHandler).Methods("POST")
 	r.HandleFunc("/api/audit-logs", auditSvc.GetAuditLogsHandler).Methods("GET")
 	r.HandleFunc("/api/audit-logs/actions", auditSvc.GetActionsHandler).Methods("GET")
+	r.HandleFunc("/api/audit-logs/filter-values", auditSvc.GetAuditLogsFilterValuesHandler).Methods("GET")
 
 	// Report routes
 	r.HandleFunc("/api/v1/audit-service/reports/{report_id}", reportSvc.GetReport).Methods("GET")
