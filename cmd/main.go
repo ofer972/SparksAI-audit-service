@@ -60,6 +60,5 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file, %s", err)
 	}
-
 	viper.AutomaticEnv()
 }
